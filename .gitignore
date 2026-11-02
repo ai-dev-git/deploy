@@ -1,0 +1,10 @@
+private/
+storage/secrets.json
+storage/dummy.key
+storage/secrets.lock
+storage/nonces/
+storage/logs/
+storage/ratelimit/
+storage/modules/*/
+!storage/modules/index.php
+*.tmp
