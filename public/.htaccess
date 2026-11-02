@@ -1,0 +1,16 @@
+Options -Indexes
+DirectoryIndex index.php
+SetEnv no-gzip 1
+
+<IfModule mod_deflate.c>
+  SetEnvIf Request_URI ".*" no-gzip=1
+</IfModule>
+
+<FilesMatch "\.(?:md|json|key|log|ini|zip|phar|dist)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Deny from all
+  </IfModule>
+</FilesMatch>

@@ -1,0 +1,6 @@
+Options -Indexes
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^(?:src|bin|config|storage|private|examples)(?:/|$) - [F,L]
+  RewriteRule ^bootstrap\.php$ - [F,L]
+</IfModule>
