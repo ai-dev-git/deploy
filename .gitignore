@@ -5,6 +5,7 @@ storage/secrets.lock
 storage/nonces/
 storage/logs/
 storage/ratelimit/
+storage/keys/
 storage/modules/*/
 !storage/modules/index.php
 *.tmp
