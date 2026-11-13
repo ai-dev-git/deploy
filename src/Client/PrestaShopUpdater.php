@@ -114,23 +114,55 @@ final class PrestaShopUpdater
         if ($loaded === null) {
             return null;
         }
-        [$path, $installed, $config] = $loaded;
+        [$path, $installed] = $loaded;
         $cached = self::readNotice($path);
         if (is_string($cached)) {
             return self::isNewer($cached, $installed) ? $cached : null;
+        }
+
+        $status = self::remoteVersion($module);
+
+        return self::isNewer((string) ($status['version'] ?? ''), $installed) ? $status['version'] : null;
+    }
+
+    /**
+     * Version publiée, ou le message qui explique pourquoi elle est absente.
+     * Le contrôle réussi est conservé quelques minutes.
+     *
+     * @return array{version: ?string, error: ?string}
+     */
+    public static function remoteVersion(object $module): array
+    {
+        AdminTranslator::set(self::translator($module));
+        $loaded = self::moduleContext($module);
+        if ($loaded === null) {
+            return ['version' => null, 'error' => AdminTranslator::line('Update configuration is missing.')];
+        }
+        [$path, $config] = [$loaded[0], $loaded[2]];
+        $cached = self::readNoticeRecord($path);
+        if ($cached !== null && ($cached['version'] !== '' || $cached['error'] !== '')) {
+            return [
+                'version' => $cached['version'] !== '' ? $cached['version'] : null,
+                'error' => $cached['error'] !== '' ? $cached['error'] : null,
+            ];
         }
 
         try {
             $config['timeout'] = 8;
             $remote = UpdateClient::fromConfig($config)->check()->version;
             self::writeNotice($path, $remote, 900);
-        } catch (Throwable) {
-            self::writeNotice($path, '', 120);
 
-            return null;
+            return ['version' => $remote, 'error' => null];
+        } catch (Throwable $exception) {
+            $message = $exception instanceof ModuleUpdateException
+                ? $exception->getMessage()
+                : AdminTranslator::line('The remote release is unavailable.');
+            if (stripos($message, 'incomplete') === false) {
+                self::writeNotice($path, '', 120, $message);
+            }
+
+            return ['version' => null, 'error' => $message];
         }
-
-        return self::isNewer($remote, $installed) ? $remote : null;
     }
 
     /**
@@ -197,23 +229,39 @@ final class PrestaShopUpdater
         return $remote !== '' && self::isVersionLabel($remote) && version_compare($remote, $installed, '>');
     }
 
-    private static function readNotice(string $path): false|string
+    private static function readNotice(string $path): ?string
+    {
+        $record = self::readNoticeRecord($path);
+        if ($record === null) {
+            return null;
+        }
+
+        return $record['version'];
+    }
+
+    /**
+     * @return array{version: string, error: string}|null
+     */
+    private static function readNoticeRecord(string $path): ?array
     {
         $raw = is_file(self::noticePath($path)) ? file_get_contents(self::noticePath($path)) : false;
         $data = is_string($raw) ? json_decode($raw, true) : null;
         if (!is_array($data) || (int) ($data['expires'] ?? 0) < time() || !is_string($data['version'] ?? null)) {
-            return false;
+            return null;
         }
 
-        return $data['version'];
+        return [
+            'version' => $data['version'],
+            'error' => is_string($data['error'] ?? null) ? $data['error'] : '',
+        ];
     }
 
-    private static function writeNotice(string $path, string $version, int $ttl): void
+    private static function writeNotice(string $path, string $version, int $ttl, string $error = ''): void
     {
         if (!self::ensureStateDirectory($path)) {
             return;
         }
-        $json = json_encode(['version' => $version, 'expires' => time() + $ttl], JSON_THROW_ON_ERROR);
+        $json = json_encode(['version' => $version, 'error' => $error, 'expires' => time() + $ttl], JSON_THROW_ON_ERROR);
         file_put_contents(self::noticePath($path), $json, LOCK_EX);
     }
 

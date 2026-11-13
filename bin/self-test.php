@@ -50,6 +50,16 @@ function run_self_test(string $root, ?array &$server): void
 {
     mkdir($root);
     $project = dirname(__DIR__);
+    $other = $root . DIRECTORY_SEPARATOR . 'other-updates';
+    mkdir($other . DIRECTORY_SEPARATOR . 'src', 0755, true);
+    copy($project . DIRECTORY_SEPARATOR . 'bootstrap.php', $other . DIRECTORY_SEPARATOR . 'bootstrap.php');
+    file_put_contents(
+        $other . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'SecondCopyProbe.php',
+        "<?php\nnamespace AiDev\\ModuleUpdate;\nclass SecondCopyProbe { public const OK = true; }\n"
+    );
+    include $other . DIRECTORY_SEPARATOR . 'bootstrap.php';
+    expect(module_update_root() === realpath($project), 'deux bibliothèques clientes cohabitent');
+    expect(class_exists(\AiDev\ModuleUpdate\SecondCopyProbe::class) && \AiDev\ModuleUpdate\SecondCopyProbe::OK, 'la seconde copie reste chargeable');
     $shop = $root . DIRECTORY_SEPARATOR . 'shop' . DIRECTORY_SEPARATOR . 'monmodule';
     mkdir($shop . DIRECTORY_SEPARATOR . 'config', 0755, true);
     mkdir($shop . DIRECTORY_SEPARATOR . 'var', 0755, true);
